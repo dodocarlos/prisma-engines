@@ -5,16 +5,21 @@ pub(crate) use quaint::connector::rusqlite;
 use quaint::connector::{GetRow, ToColumnNames};
 use schema_connector::{ConnectorError, ConnectorResult};
 use sql_schema_describer::{sqlite as describer, DescriberErrorKind, SqlSchema};
-use std::sync::Mutex;
+use std::{env, sync::Mutex};
 use user_facing_errors::schema_engine::ApplyMigrationError;
 
 pub(super) struct Connection(Mutex<rusqlite::Connection>);
 
 impl Connection {
     pub(super) fn new(params: &super::Params) -> ConnectorResult<Self> {
-        Ok(Connection(Mutex::new(
-            rusqlite::Connection::open(&params.file_path).map_err(convert_error)?,
-        )))
+        let conn = rusqlite::Connection::open(&params.file_path).map_err(convert_error)?;
+
+        let encryption_key = env::var("SQLITE_ENCRYPTION_KEY").unwrap_or(String::new());
+        if !encryption_key.is_empty() {
+            let _ = conn.pragma_update(None, "key", &Some(encryption_key));
+        }
+
+        Ok(Connection(Mutex::new(conn)))
     }
 
     pub(super) fn new_in_memory() -> Self {

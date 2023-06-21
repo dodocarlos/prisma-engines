@@ -11,7 +11,7 @@ use crate::{
     visitor::{self, Visitor},
 };
 use async_trait::async_trait;
-use std::{convert::TryFrom, path::Path, time::Duration};
+use std::{convert::TryFrom, env, path::Path, time::Duration};
 use tokio::sync::Mutex;
 
 pub(crate) const DEFAULT_SQLITE_SCHEMA_NAME: &str = "main";
@@ -138,6 +138,11 @@ impl TryFrom<&str> for Sqlite {
         if let Some(timeout) = params.socket_timeout {
             conn.busy_timeout(timeout)?;
         };
+
+        let encryption_key = env::var("SQLITE_ENCRYPTION_KEY").unwrap_or(String::new());
+        if !encryption_key.is_empty() {
+            conn.pragma_update(None, "key", &Some(encryption_key))?;
+        }
 
         let client = Mutex::new(conn);
 
